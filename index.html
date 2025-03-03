@@ -1,0 +1,129 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS Streaming Tool</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>OBS Streaming Tool</h1>
+            <div id="connection-status" class="disconnected">Disconnected</div>
+        </header>
+        
+        <main>
+            <div id="setup-container">
+                <div class="card" id="server-download">
+                    <h2>1. Download Server</h2>
+                    <p>Download and run the server script on your MX Linux device:</p>
+                    <a href="obs-stream-server.sh" download class="btn primary">Download Server Script</a>
+                    <div class="instructions">
+                        <p>After downloading:</p>
+                        <ol>
+                            <li>Open Terminal</li>
+                            <li>Navigate to download location: <code>cd ~/Downloads</code></li>
+                            <li>Make script executable: <code>chmod +x obs-stream-server.sh</code></li>
+                            <li>Run the script: <code>./obs-stream-server.sh</code></li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="card" id="connection-setup">
+                    <h2>2. Connect to Server</h2>
+                    <div class="form-group">
+                        <label for="server-address">Server Address:</label>
+                        <input type="text" id="server-address" value="localhost:8080" placeholder="localhost:8080">
+                    </div>
+                    <button id="connect-btn" class="btn primary">Connect</button>
+                </div>
+            </div>
+
+            <div id="streaming-panel" class="hidden">
+                <div class="card">
+                    <h2>Streaming Settings</h2>
+                    
+                    <div class="form-group">
+                        <label for="stream-key">Stream Key:</label>
+                        <input type="password" id="stream-key" placeholder="Enter your stream key">
+                        <button id="show-key" class="btn small">Show</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="streaming-platform">Platform:</label>
+                        <select id="streaming-platform">
+                            <option value="twitch">Twitch</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="custom">Custom RTMP</option>
+                        </select>
+                    </div>
+                    
+                    <div id="custom-rtmp" class="form-group hidden">
+                        <label for="rtmp-url">RTMP URL:</label>
+                        <input type="text" id="rtmp-url" placeholder="rtmp://your-server/path">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="video-bitrate">Video Bitrate (kbps):</label>
+                        <input type="range" id="video-bitrate" min="1000" max="10000" step="500" value="3500">
+                        <span id="video-bitrate-value">3500</span>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="audio-bitrate">Audio Bitrate (kbps):</label>
+                        <input type="range" id="audio-bitrate" min="64" max="320" step="32" value="128">
+                        <span id="audio-bitrate-value">128</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>Window Selection</h2>
+                    <div id="window-selection">
+                        <p>Loading available windows...</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>Stream Control</h2>
+                    <div class="preview-container">
+                        <div id="stream-preview">
+                            <div class="placeholder">Preview will appear here when streaming</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stream-stats">
+                        <div class="stat">
+                            <span class="label">Status:</span>
+                            <span id="stream-status" class="value">Idle</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">FPS:</span>
+                            <span id="stream-fps" class="value">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Bitrate:</span>
+                            <span id="current-bitrate" class="value">0 kbps</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Duration:</span>
+                            <span id="stream-duration" class="value">00:00:00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="button-container">
+                        <button id="start-stream" class="btn success">Start Streaming</button>
+                        <button id="stop-stream" class="btn danger disabled">Stop Streaming</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <div id="notifications"></div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script src="script.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
