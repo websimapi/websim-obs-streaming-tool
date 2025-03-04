@@ -229,120 +229,106 @@ function startStream(config) {
         return;
     }
     
-    // Base FFmpeg arguments
-    const args = [
-        '-f', 'x11grab',
-        '-video_size', '1280x720',
-        '-framerate', '30',
-        '-i', `:0.0+0,0`,
-        '-f', 'pulse',
-        '-ac', '2',
-        '-i', 'default',
-        '-c:v', 'libx264',
-        '-preset', 'veryfast',
-        '-b:v', `${config.videoBitrate}k`,
-        '-maxrate', `${config.videoBitrate}k`,
-        '-bufsize', `${config.videoBitrate * 2}k`,
-        '-pix_fmt', 'yuv420p',
-        '-g', '60',
-        '-c:a', 'aac',
-        '-b:a', `${config.audioBitrate}k`,
-        '-ar', '44100',
-        '-f', 'flv',
-        rtmpUrl
-    ];
-    
-    // Replace with window-specific capture configuration if a window is selected
-    if (config.windowId) {
-        // Get window position and size using xwininfo
-        exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
-            if (error) {
-                console.error(`Error getting window info: ${error.message}`);
-                io.emit('stream-status', { 
-                    status: 'Error', 
-                    message: 'Failed to get window information' 
-                });
-                return;
-            }
-            
-            // Parse window position and size
-            const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
-            const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
-            const widthMatch = stdout.match(/Width:\s+(\d+)/);
-            const heightMatch = stdout.match(/Height:\s+(\d+)/);
-            
-            if (absXMatch && absYMatch && widthMatch && heightMatch) {
-                const x = parseInt(absXMatch[1]);
-                const y = parseInt(absYMatch[1]);
-                const width = parseInt(widthMatch[1]);
-                const height = parseInt(heightMatch[1]);
-                
-                // Update the FFmpeg arguments to capture just this window
-                const videoSizeIndex = args.indexOf('-video_size') + 1;
-                if (videoSizeIndex > 0) {
-                    args[videoSizeIndex] = `${width}x${height}`;
-                }
-                
-                const inputIndex = args.indexOf('-i') + 1;
-                if (inputIndex > 0) {
-                    args[inputIndex] = `:0.0+${x},${y}`;
-                }
-                
-                console.log(`Streaming window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
-                startStreamProcess(args);
-            } else {
-                console.error('Failed to parse window position and size');
-                io.emit('stream-status', { 
-                    status: 'Error', 
-                    message: 'Failed to parse window information' 
-                });
-            }
+    // Check if window ID is provided
+    if (!config.windowId) {
+        io.emit('stream-status', { 
+            status: 'Error', 
+            message: 'No window selected for streaming' 
         });
-    } else {
-        startStreamProcess(args);
+        return;
     }
-}
-
-// Helper function to start the streaming process
-function startStreamProcess(args) {
-    console.log(`Starting stream with args: ${args.join(' ')}`);
     
-    streamProcess = spawn('ffmpeg', args);
-    
-    streamProcess.stderr.on('data', (data) => {
-        const output = data.toString();
-        // console.log(`Stream stderr: ${output}`);
-        
-        // Extract fps and bitrate from ffmpeg output
-        const fpsMatch = output.match(/fps=\s*([0-9.]+)/);
-        const bitrateMatch = output.match(/bitrate=\s*([0-9.]+)kbits\/s/);
-        
-        if (fpsMatch || bitrateMatch) {
-            const stats = {};
-            if (fpsMatch) stats.fps = parseFloat(fpsMatch[1]);
-            if (bitrateMatch) stats.bitrate = parseFloat(bitrateMatch[1]);
-            
-            io.emit('stream-stats', stats);
-        }
-    });
-    
-    streamProcess.on('close', (code) => {
-        console.log(`Stream process exited with code ${code}`);
-        
-        if (isStreaming) {
-            // If the process ended unexpectedly
+    // Get window position and size
+    exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
+        if (error) {
+            console.error(`Error getting window info: ${error.message}`);
             io.emit('stream-status', { 
                 status: 'Error', 
-                message: `Stream ended unexpectedly with code ${code}` 
+                message: 'Failed to get window information' 
             });
+            return;
         }
         
-        isStreaming = false;
-        streamProcess = null;
+        // Parse window position and size
+        const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
+        const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
+        const widthMatch = stdout.match(/Width:\s+(\d+)/);
+        const heightMatch = stdout.match(/Height:\s+(\d+)/);
+        
+        if (absXMatch && absYMatch && widthMatch && heightMatch) {
+            const x = parseInt(absXMatch[1]);
+            const y = parseInt(absYMatch[1]);
+            const width = parseInt(widthMatch[1]);
+            const height = parseInt(heightMatch[1]);
+            
+            // Setup FFmpeg args for specific window capture
+            const args = [
+                '-f', 'x11grab',
+                '-video_size', `${width}x${height}`,
+                '-framerate', '30',
+                '-i', `:0.0+${x},${y}`,
+                '-f', 'pulse',
+                '-ac', '2',
+                '-i', 'default',
+                '-c:v', 'libx264',
+                '-preset', 'veryfast',
+                '-b:v', `${config.videoBitrate}k`,
+                '-maxrate', `${config.videoBitrate}k`,
+                '-bufsize', `${config.videoBitrate * 2}k`,
+                '-pix_fmt', 'yuv420p',
+                '-g', '60',
+                '-c:a', 'aac',
+                '-b:a', `${config.audioBitrate}k`,
+                '-ar', '44100',
+                '-f', 'flv',
+                rtmpUrl
+            ];
+            
+            console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
+            
+            streamProcess = spawn('ffmpeg', args);
+            
+            streamProcess.stderr.on('data', (data) => {
+                const output = data.toString();
+                
+                // Extract fps and bitrate from ffmpeg output
+                const fpsMatch = output.match(/fps=\s*([0-9.]+)/);
+                const bitrateMatch = output.match(/bitrate=\s*([0-9.]+)kbits\/s/);
+                
+                if (fpsMatch || bitrateMatch) {
+                    const stats = {};
+                    if (fpsMatch) stats.fps = parseFloat(fpsMatch[1]);
+                    if (bitrateMatch) stats.bitrate = parseFloat(bitrateMatch[1]);
+                    
+                    io.emit('stream-stats', stats);
+                }
+            });
+            
+            streamProcess.on('close', (code) => {
+                console.log(`Stream process exited with code ${code}`);
+                
+                if (isStreaming) {
+                    // If the process ended unexpectedly
+                    io.emit('stream-status', { 
+                        status: 'Error', 
+                        message: `Stream ended unexpectedly with code ${code}` 
+                    });
+                }
+                
+                isStreaming = false;
+                streamProcess = null;
+            });
+            
+            isStreaming = true;
+            io.emit('stream-status', { status: 'Streaming' });
+        } else {
+            console.error('Failed to parse window position and size');
+            io.emit('stream-status', { 
+                status: 'Error', 
+                message: 'Failed to parse window information' 
+            });
+        }
     });
-    
-    isStreaming = true;
-    io.emit('stream-status', { status: 'Streaming' });
 }
 
 // Stop streaming

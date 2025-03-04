@@ -162,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function selectWindow(windowId) {
+        console.log(`Selecting window: ${windowId}`);
+        
         // Clear previous selection
         const previousSelected = windowSelection.querySelector('.selected');
         if (previousSelected) {
@@ -175,15 +177,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         selectedWindow = windowId;
-        socket.emit('select-window', { windowId });
         
         // Request preview of selected window
         socket.emit('get-window-preview', { windowId });
         
-        // Enable start streaming if window is selected
-        if (startStreamBtn.classList.contains('disabled') && !isStreaming) {
+        // Enable start streaming button if a window is selected and not currently streaming
+        if (!isStreaming) {
             startStreamBtn.classList.remove('disabled');
         }
+        
+        showNotification(`Window selected: ${windowElement?.querySelector('div').textContent || windowId}`, 'info');
     }
 
     function handleWindowPreview(data) {
@@ -252,10 +255,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startStreaming() {
-        if (isStreaming || !selectedWindow) {
-            if (!selectedWindow) {
-                showNotification('Please select a window to stream', 'error');
-            }
+        if (isStreaming) {
+            return;
+        }
+        
+        if (!selectedWindow) {
+            showNotification('Please select a window to stream', 'error');
             return;
         }
         
