@@ -110,7 +110,8 @@ function generateWindowThumbnail(windowId) {
     return new Promise((resolve, reject) => {
         const outputFile = path.join(TEMP_DIR, `window_${windowId}.jpg`);
         
-        exec(`import -window 0x${windowId} -resize 160x120 ${outputFile}`, (error) => {
+        // Use xwd to capture the window content directly rather than using import
+        exec(`xwd -id 0x${windowId} | convert xwd:- -resize 160x120 ${outputFile}`, (error) => {
             if (error) {
                 console.error(`Error generating thumbnail: ${error.message}`);
                 reject(error);
@@ -159,53 +160,50 @@ function startWindowPreview(windowId) {
             const width = parseInt(widthMatch[1]);
             const height = parseInt(heightMatch[1]);
             
-            // Use ffmpeg to capture the specific window and output frames
-            const args = [
-                '-f', 'x11grab',
-                '-video_size', `${width}x${height}`,
-                '-framerate', '10',
-                '-i', `:0.0+${x},${y}`,
-                '-q:v', '5',
-                '-frames:v', '1',
-                '-update', '1',
-                '-y',
-                path.join(TEMP_DIR, 'preview.jpg')
-            ];
+            // Use xwd to capture the specific window contents directly
+            const previewFile = path.join(TEMP_DIR, 'preview.jpg');
             
-            previewProcess = spawn('ffmpeg', args);
+            const captureCommand = `xwd -id 0x${windowId} | convert xwd:- -resize ${width}x${height} ${previewFile}`;
             
-            previewProcess.stderr.on('data', (data) => {
-                console.log(`Preview stderr: ${data}`);
+            // Execute the capture once immediately
+            exec(captureCommand, (error) => {
+                if (error) {
+                    console.error(`Error capturing window preview: ${error.message}`);
+                    return;
+                }
+                
+                // Read and send the first frame
+                fs.readFile(previewFile, (err, data) => {
+                    if (!err) {
+                        io.emit('window-preview', { frame: data });
+                    }
+                });
             });
             
-            previewProcess.on('close', (code) => {
-                console.log(`Preview process exited with code ${code}`);
-            });
+            // Setup interval for continuous preview
+            const previewInterval = setInterval(() => {
+                exec(captureCommand, (error) => {
+                    if (error) {
+                        console.error(`Error in preview capture: ${error.message}`);
+                        return;
+                    }
+                    
+                    fs.readFile(previewFile, (err, data) => {
+                        if (!err) {
+                            io.emit('window-preview', { frame: data });
+                        }
+                    });
+                });
+            }, 1000); // Update preview every second
             
-            // Start sending preview frames to client
-            startSendingPreviewFrames();
+            // Store the interval to clear it later
+            previewProcess = { 
+                kill: () => {
+                    clearInterval(previewInterval);
+                }
+            };
         }
     });
-}
-
-// Send preview frames to the client
-function startSendingPreviewFrames() {
-    const previewFile = path.join(TEMP_DIR, 'preview.jpg');
-    const interval = setInterval(() => {
-        if (io.sockets.sockets.size === 0) {
-            clearInterval(interval);
-            return;
-        }
-        
-        fs.readFile(previewFile, (err, data) => {
-            if (err) {
-                console.error(`Error reading preview: ${err.message}`);
-                return;
-            }
-            
-            io.emit('window-preview', { frame: data });
-        });
-    }, 200); // Send 5 frames per second
 }
 
 // Start streaming
@@ -239,7 +237,7 @@ function startStream(config) {
         return;
     }
     
-    // Get window position and size without requiring focus
+    // Use xwininfo to get window info without changing focus
     exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
         if (error) {
             console.error(`Error getting window info: ${error.message}`);
@@ -262,13 +260,15 @@ function startStream(config) {
             const width = parseInt(widthMatch[1]);
             const height = parseInt(heightMatch[1]);
             
-            // Setup FFmpeg args for specific window capture
+            // Setup FFmpeg args for specific window capture using x11grab with provided window ID
+            // We'll capture from the window directly
             const args = [
                 '-f', 'x11grab',
                 '-video_size', `${width}x${height}`,
                 '-framerate', '30',
                 '-draw_mouse', '1',
-                '-i', `:0.0+${x},${y}`,
+                // Use -i window_id for direct window capture
+                '-i', `:0.0+0,0@0x${config.windowId}`,
                 '-f', 'pulse',
                 '-ac', '2',
                 '-i', 'default',
@@ -286,7 +286,7 @@ function startStream(config) {
                 rtmpUrl
             ];
             
-            console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
+            console.log(`Starting stream of window 0x${config.windowId}`);
             
             streamProcess = spawn('ffmpeg', args);
             

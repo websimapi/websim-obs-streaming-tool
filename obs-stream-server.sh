@@ -622,6 +622,14 @@ if ! check_dependency "import"; then
     MISSING_DEPS+=("imagemagick")
 fi
 
+if ! check_dependency "xwd"; then
+    MISSING_DEPS+=("x11-apps")
+fi
+
+if ! check_dependency "convert"; then
+    MISSING_DEPS+=("imagemagick")
+fi
+
 # Install missing dependencies
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo "The following dependencies are missing and will be installed:"
