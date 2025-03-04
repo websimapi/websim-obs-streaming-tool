@@ -110,19 +110,7 @@ function generateWindowThumbnail(windowId) {
     return new Promise((resolve, reject) => {
         const outputFile = path.join(TEMP_DIR, `window_${windowId}.jpg`);
         
-        const args = [
-            '-f', 'x11grab',
-            '-video_size', '160x120',
-            '-framerate', '10',
-            '-i', `:0.0+0,0`,
-            '-follow_mouse', '0',
-            '-q:v', '5',
-            '-update', '1',
-            '-y',
-            outputFile
-        ];
-        
-        exec(`ffmpeg ${args.join(' ')}`, (error) => {
+        exec(`import -window 0x${windowId} -resize 160x120 ${outputFile}`, (error) => {
             if (error) {
                 console.error(`Error generating thumbnail: ${error.message}`);
                 reject(error);
@@ -177,7 +165,7 @@ function startWindowPreview(windowId) {
                 '-video_size', `${width}x${height}`,
                 '-framerate', '10',
                 '-i', `:0.0+${x},${y}`,
-                '-follow_mouse', '0',
+                '-follow_window', '0x' + windowId, 
                 '-q:v', '5',
                 '-update', '1',
                 '-y',
@@ -280,7 +268,7 @@ function startStream(config) {
                 '-video_size', `${width}x${height}`,
                 '-framerate', '30',
                 '-i', `:0.0+${x},${y}`,
-                '-follow_mouse', '0',
+                '-follow_window', '0x' + config.windowId, 
                 '-f', 'pulse',
                 '-ac', '2',
                 '-i', 'default',
