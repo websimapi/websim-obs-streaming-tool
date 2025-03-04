@@ -61,20 +61,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 socket.disconnect();
             }
 
-            // Create WebSocket connection
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = serverAddress.startsWith('http') 
-                ? serverAddress.replace(/^http(s?):\/\//, '')
-                : serverAddress;
-                
-            socket = io(`${protocol}//${wsAddress}`, {
+            // Create socket.io connection with proper URL formatting
+            let socketUrl = serverAddress;
+            
+            // Make sure the URL has a protocol
+            if (!socketUrl.startsWith('http://') && !socketUrl.startsWith('https://')) {
+                socketUrl = `http://${socketUrl}`;
+            }
+            
+            console.log(`Connecting to: ${socketUrl}`);
+            socket = io(socketUrl, {
                 reconnectionAttempts: 5,
-                timeout: 10000
+                timeout: 10000,
+                transports: ['websocket', 'polling'] // Try both transport methods
             });
 
             // Setup socket event handlers
             socket.on('connect', handleSocketConnect);
             socket.on('disconnect', handleSocketDisconnect);
+            socket.on('connect_error', (error) => {
+                console.error("Connection error:", error);
+                handleSocketError(error);
+            });
             socket.on('error', handleSocketError);
             socket.on('windows-list', handleWindowsList);
             socket.on('window-preview', handleWindowPreview);
@@ -117,8 +125,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleSocketError(error) {
-        showNotification(`Socket error: ${error}`, 'error');
+        showNotification(`Connection error: ${error.message || 'Unknown error'}`, 'error');
         console.error("Socket error:", error);
+        connectionStatus.textContent = 'Disconnected';
+        connectionStatus.className = 'disconnected';
     }
 
     function handleWindowsList(windows) {
@@ -337,4 +347,3 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     }
 });
-
