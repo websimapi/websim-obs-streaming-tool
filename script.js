@@ -205,6 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             previewVideo.src = url;
+            previewVideo.onload = function() {
+                URL.revokeObjectURL(url);
+            };
         }
     }
 
