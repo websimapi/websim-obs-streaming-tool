@@ -140,33 +140,52 @@ function startWindowPreview(windowId) {
         previewProcess = null;
     }
     
-    // Use ffmpeg to capture the window and output frames
-    const args = [
-        '-f', 'x11grab',
-        '-video_size', '1280x720', // We can improve this by getting actual window size
-        '-framerate', '10',
-        '-i', `:0.0+0,0`,
-        '-vf', `crop=iw:ih:0:0`,
-        '-q:v', '5',
-        '-update', '1',
-        '-y',
-        path.join(TEMP_DIR, 'preview.jpg')
-    ];
-    
-    previewProcess = spawn('ffmpeg', args);
-    
-    previewProcess.stderr.on('data', (data) => {
-        console.log(`Preview stderr: ${data}`);
+    // Get window position and size
+    exec(`xwininfo -id 0x${windowId}`, (error, stdout) => {
+        if (error) {
+            console.error(`Error getting window info: ${error.message}`);
+            return;
+        }
+        
+        // Parse window position and size
+        const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
+        const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
+        const widthMatch = stdout.match(/Width:\s+(\d+)/);
+        const heightMatch = stdout.match(/Height:\s+(\d+)/);
+        
+        if (absXMatch && absYMatch && widthMatch && heightMatch) {
+            const x = parseInt(absXMatch[1]);
+            const y = parseInt(absYMatch[1]);
+            const width = parseInt(widthMatch[1]);
+            const height = parseInt(heightMatch[1]);
+            
+            // Use ffmpeg to capture the specific window and output frames
+            const args = [
+                '-f', 'x11grab',
+                '-video_size', `${width}x${height}`,
+                '-framerate', '10',
+                '-i', `:0.0+${x},${y}`,
+                '-q:v', '5',
+                '-update', '1',
+                '-y',
+                path.join(TEMP_DIR, 'preview.jpg')
+            ];
+            
+            previewProcess = spawn('ffmpeg', args);
+            
+            previewProcess.stderr.on('data', (data) => {
+                console.log(`Preview stderr: ${data}`);
+            });
+            
+            previewProcess.on('close', (code) => {
+                console.log(`Preview process exited with code ${code}`);
+            });
+            
+            // Start sending preview frames to client
+            startSendingPreviewFrames();
+        }
     });
-    
-    previewProcess.on('close', (code) => {
-        console.log(`Preview process exited with code ${code}`);
-    });
-    
-    // Start sending preview frames to client
-    startSendingPreviewFrames();
 }
-
 // Send preview frames to the client
 function startSendingPreviewFrames() {
     const previewFile = path.join(TEMP_DIR, 'preview.jpg');
@@ -287,7 +306,7 @@ function startStreamProcess(args) {
     
     streamProcess.stderr.on('data', (data) => {
         const output = data.toString();
-        console.log(`Stream stderr: ${output}`);
+        // console.log(`Stream stderr: ${output}`);
         
         // Extract fps and bitrate from ffmpeg output
         const fpsMatch = output.match(/fps=\s*([0-9.]+)/);

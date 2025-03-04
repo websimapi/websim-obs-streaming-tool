@@ -179,23 +179,31 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Request preview of selected window
         socket.emit('get-window-preview', { windowId });
+        
+        // Enable start streaming if window is selected
+        if (startStreamBtn.classList.contains('disabled') && !isStreaming) {
+            startStreamBtn.classList.remove('disabled');
+        }
     }
 
     function handleWindowPreview(data) {
+        // Create or get the preview video element
         if (!previewVideo) {
-            // Create video element for preview
+            // Remove placeholder if it exists
             const placeholder = streamPreview.querySelector('.placeholder');
             if (placeholder) {
                 placeholder.remove();
             }
             
-            previewVideo = document.createElement('video');
-            previewVideo.autoplay = true;
-            previewVideo.muted = true;
+            // Create image element for preview
+            previewVideo = document.createElement('img');
+            previewVideo.style.width = '100%';
+            previewVideo.style.height = '100%';
+            previewVideo.style.objectFit = 'contain';
             streamPreview.appendChild(previewVideo);
         }
         
-        // Update the video source with the received frame
+        // Update the preview with the received frame
         if (data.frame) {
             const blob = new Blob([data.frame], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
@@ -206,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             previewVideo.src = url;
             previewVideo.onload = function() {
-                URL.revokeObjectURL(url);
+                URL.revokeObjectURL(this.src);
             };
         }
     }
@@ -244,7 +252,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startStreaming() {
-        if (isStreaming || !selectedWindow) return;
+        if (isStreaming || !selectedWindow) {
+            if (!selectedWindow) {
+                showNotification('Please select a window to stream', 'error');
+            }
+            return;
+        }
         
         const streamKey = streamKeyInput.value.trim();
         if (!streamKey) {
