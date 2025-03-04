@@ -159,12 +159,13 @@ function startWindowPreview(windowId) {
             const width = parseInt(widthMatch[1]);
             const height = parseInt(heightMatch[1]);
             
-            // Use ffmpeg to capture the specific window by window ID instead of coordinates
+            // Use ffmpeg to capture the specific window and output frames
             const args = [
                 '-f', 'x11grab',
-                '-window_id', `0x${windowId}`,
+                '-video_size', `${width}x${height}`,
                 '-framerate', '10',
-                '-i', `:0.0`,
+                '-i', `:0.0+${x},${y}`,
+                '-follow_window', '0x' + windowId, 
                 '-q:v', '5',
                 '-update', '1',
                 '-y',
@@ -261,12 +262,13 @@ function startStream(config) {
             const width = parseInt(widthMatch[1]);
             const height = parseInt(heightMatch[1]);
             
-            // Setup FFmpeg args for specific window capture by window ID
+            // Setup FFmpeg args for specific window capture
             const args = [
                 '-f', 'x11grab',
-                '-window_id', `0x${config.windowId}`,
+                '-video_size', `${width}x${height}`,
                 '-framerate', '30',
-                '-i', `:0.0`,
+                '-i', `:0.0+${x},${y}`,
+                '-follow_window', '0x' + config.windowId, 
                 '-f', 'pulse',
                 '-ac', '2',
                 '-i', 'default',
@@ -284,7 +286,7 @@ function startStream(config) {
                 rtmpUrl
             ];
             
-            console.log(`Starting stream of window 0x${config.windowId}`);
+            console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
             
             streamProcess = spawn('ffmpeg', args);
             

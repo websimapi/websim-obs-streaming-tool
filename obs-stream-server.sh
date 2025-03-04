@@ -521,6 +521,8 @@ process.on('SIGINT', () => {
 EOF
     
     log "Server script created"
+    
+    sed -i 's/'-f', 'x11grab',/'-f', 'x11grab',\n                '-follow_window', '0x' + windowId,/g' server.js
 }
 
 create_public_directory() {
@@ -650,6 +652,12 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
         echo "Cannot continue without required dependencies. Exiting."
         exit 1
     fi
+fi
+
+# After installing dependencies, make sure we have xdotool
+if ! command -v xdotool &> /dev/null; then
+    log "Installing xdotool for window management"
+    sudo apt-get install -y xdotool
 fi
 
 # Create server directory
