@@ -163,7 +163,7 @@ function startWindowPreview(windowId) {
             // Use xwd to capture the specific window contents directly
             const previewFile = path.join(TEMP_DIR, 'preview.jpg');
             
-            const captureCommand = `xwd -id 0x${windowId} | convert xwd:- -resize ${width}x${height} ${previewFile}`;
+            const captureCommand = `xwd -id 0x${windowId} | convert xwd:- ${previewFile}`;
             
             // Execute the capture once immediately
             exec(captureCommand, (error) => {
@@ -175,7 +175,7 @@ function startWindowPreview(windowId) {
                 // Read and send the first frame
                 fs.readFile(previewFile, (err, data) => {
                     if (!err) {
-                        io.emit('window-preview', { frame: data });
+                        io.emit('window-preview', { frame: data.toString('base64') });
                     }
                 });
             });
@@ -190,7 +190,7 @@ function startWindowPreview(windowId) {
                     
                     fs.readFile(previewFile, (err, data) => {
                         if (!err) {
-                            io.emit('window-preview', { frame: data });
+                            io.emit('window-preview', { frame: data.toString('base64') });
                         }
                     });
                 });

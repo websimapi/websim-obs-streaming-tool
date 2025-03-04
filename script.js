@@ -209,17 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the preview with the received frame
         if (data.frame) {
             try {
-                const blob = new Blob([data.frame], { type: 'image/jpeg' });
-                const url = URL.createObjectURL(blob);
+                // Use a data URL for the image
+                previewVideo.src = `data:image/jpeg;base64,${data.frame}`;
                 
-                if (previewVideo.src) {
-                    URL.revokeObjectURL(previewVideo.src);
-                }
-                
-                previewVideo.src = url;
-                previewVideo.onload = function() {
-                    URL.revokeObjectURL(url);
-                };
                 previewVideo.onerror = function(e) {
                     console.error("Error loading preview image:", e);
                     showNotification("Error loading preview image", "error");
