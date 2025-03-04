@@ -140,58 +140,51 @@ function startWindowPreview(windowId) {
         previewProcess = null;
     }
     
-    // Focus the window before capturing
-    exec(`xdotool windowactivate 0x${windowId}`, (error) => {
+    // Get window position and size without focusing
+    exec(`xwininfo -id 0x${windowId}`, (error, stdout) => {
         if (error) {
-            console.error(`Error focusing window: ${error.message}`);
+            console.error(`Error getting window info: ${error.message}`);
+            return;
         }
         
-        // Get window position and size
-        exec(`xwininfo -id 0x${windowId}`, (error, stdout) => {
-            if (error) {
-                console.error(`Error getting window info: ${error.message}`);
-                return;
-            }
+        // Parse window position and size
+        const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
+        const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
+        const widthMatch = stdout.match(/Width:\s+(\d+)/);
+        const heightMatch = stdout.match(/Height:\s+(\d+)/);
+        
+        if (absXMatch && absYMatch && widthMatch && heightMatch) {
+            const x = parseInt(absXMatch[1]);
+            const y = parseInt(absYMatch[1]);
+            const width = parseInt(widthMatch[1]);
+            const height = parseInt(heightMatch[1]);
             
-            // Parse window position and size
-            const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
-            const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
-            const widthMatch = stdout.match(/Width:\s+(\d+)/);
-            const heightMatch = stdout.match(/Height:\s+(\d+)/);
+            // Use ffmpeg to capture the specific window and output frames
+            const args = [
+                '-f', 'x11grab',
+                '-video_size', `${width}x${height}`,
+                '-framerate', '10',
+                '-i', `:0.0+${x},${y}`,
+                '-q:v', '5',
+                '-frames:v', '1',
+                '-update', '1',
+                '-y',
+                path.join(TEMP_DIR, 'preview.jpg')
+            ];
             
-            if (absXMatch && absYMatch && widthMatch && heightMatch) {
-                const x = parseInt(absXMatch[1]);
-                const y = parseInt(absYMatch[1]);
-                const width = parseInt(widthMatch[1]);
-                const height = parseInt(heightMatch[1]);
-                
-                // Use ffmpeg to capture the specific window and output frames
-                const args = [
-                    '-f', 'x11grab',
-                    '-video_size', `${width}x${height}`,
-                    '-framerate', '10',
-                    '-i', `:0.0+${x},${y}`,
-                    '-q:v', '5',
-                    '-frames:v', '1',
-                    '-update', '1',
-                    '-y',
-                    path.join(TEMP_DIR, 'preview.jpg')
-                ];
-                
-                previewProcess = spawn('ffmpeg', args);
-                
-                previewProcess.stderr.on('data', (data) => {
-                    console.log(`Preview stderr: ${data}`);
-                });
-                
-                previewProcess.on('close', (code) => {
-                    console.log(`Preview process exited with code ${code}`);
-                });
-                
-                // Start sending preview frames to client
-                startSendingPreviewFrames();
-            }
-        });
+            previewProcess = spawn('ffmpeg', args);
+            
+            previewProcess.stderr.on('data', (data) => {
+                console.log(`Preview stderr: ${data}`);
+            });
+            
+            previewProcess.on('close', (code) => {
+                console.log(`Preview process exited with code ${code}`);
+            });
+            
+            // Start sending preview frames to client
+            startSendingPreviewFrames();
+        }
     });
 }
 
@@ -246,116 +239,97 @@ function startStream(config) {
         return;
     }
     
-    // Focus the window before capturing
-    exec(`xdotool windowactivate 0x${config.windowId}`, (error) => {
+    // Get window position and size without requiring focus
+    exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
         if (error) {
-            console.error(`Error focusing window: ${error.message}`);
+            console.error(`Error getting window info: ${error.message}`);
             io.emit('stream-status', { 
                 status: 'Error', 
-                message: 'Failed to focus window' 
+                message: 'Failed to get window information' 
             });
             return;
         }
         
-        // Get window position and size
-        exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
-            if (error) {
-                console.error(`Error getting window info: ${error.message}`);
-                io.emit('stream-status', { 
-                    status: 'Error', 
-                    message: 'Failed to get window information' 
-                });
-                return;
-            }
+        // Parse window position and size
+        const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
+        const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
+        const widthMatch = stdout.match(/Width:\s+(\d+)/);
+        const heightMatch = stdout.match(/Height:\s+(\d+)/);
+        
+        if (absXMatch && absYMatch && widthMatch && heightMatch) {
+            const x = parseInt(absXMatch[1]);
+            const y = parseInt(absYMatch[1]);
+            const width = parseInt(widthMatch[1]);
+            const height = parseInt(heightMatch[1]);
             
-            // Parse window position and size
-            const absXMatch = stdout.match(/Absolute upper-left X:\s+(\d+)/);
-            const absYMatch = stdout.match(/Absolute upper-left Y:\s+(\d+)/);
-            const widthMatch = stdout.match(/Width:\s+(\d+)/);
-            const heightMatch = stdout.match(/Height:\s+(\d+)/);
+            // Setup FFmpeg args for specific window capture
+            const args = [
+                '-f', 'x11grab',
+                '-video_size', `${width}x${height}`,
+                '-framerate', '30',
+                '-draw_mouse', '1',
+                '-i', `:0.0+${x},${y}`,
+                '-f', 'pulse',
+                '-ac', '2',
+                '-i', 'default',
+                '-c:v', 'libx264',
+                '-preset', 'veryfast',
+                '-b:v', `${config.videoBitrate}k`,
+                '-maxrate', `${config.videoBitrate}k`,
+                '-bufsize', `${config.videoBitrate * 2}k`,
+                '-pix_fmt', 'yuv420p',
+                '-g', '60',
+                '-c:a', 'aac',
+                '-b:a', `${config.audioBitrate}k`,
+                '-ar', '44100',
+                '-f', 'flv',
+                rtmpUrl
+            ];
             
-            if (absXMatch && absYMatch && widthMatch && heightMatch) {
-                const x = parseInt(absXMatch[1]);
-                const y = parseInt(absYMatch[1]);
-                const width = parseInt(widthMatch[1]);
-                const height = parseInt(heightMatch[1]);
+            console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
+            
+            streamProcess = spawn('ffmpeg', args);
+            
+            streamProcess.stderr.on('data', (data) => {
+                const output = data.toString();
                 
-                // Setup FFmpeg args for specific window capture
-                const args = [
-                    '-f', 'x11grab',
-                    '-video_size', `${width}x${height}`,
-                    '-framerate', '30',
-                    '-draw_mouse', '1',
-                    '-i', `:0.0+${x},${y}`,
-                    '-f', 'pulse',
-                    '-ac', '2',
-                    '-i', 'default',
-                    '-c:v', 'libx264',
-                    '-preset', 'veryfast',
-                    '-b:v', `${config.videoBitrate}k`,
-                    '-maxrate', `${config.videoBitrate}k`,
-                    '-bufsize', `${config.videoBitrate * 2}k`,
-                    '-pix_fmt', 'yuv420p',
-                    '-g', '60',
-                    '-c:a', 'aac',
-                    '-b:a', `${config.audioBitrate}k`,
-                    '-ar', '44100',
-                    '-f', 'flv',
-                    rtmpUrl
-                ];
+                // Extract fps and bitrate from ffmpeg output
+                const fpsMatch = output.match(/fps=\s*([0-9.]+)/);
+                const bitrateMatch = output.match(/bitrate=\s*([0-9.]+)kbits\/s/);
                 
-                console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
-                
-                // Keep the window focused throughout streaming
-                const keepWindowFocused = setInterval(() => {
-                    exec(`xdotool windowactivate 0x${config.windowId}`, () => {});
-                }, 1000);
-                
-                streamProcess = spawn('ffmpeg', args);
-                
-                streamProcess.stderr.on('data', (data) => {
-                    const output = data.toString();
+                if (fpsMatch || bitrateMatch) {
+                    const stats = {};
+                    if (fpsMatch) stats.fps = parseFloat(fpsMatch[1]);
+                    if (bitrateMatch) stats.bitrate = parseFloat(bitrateMatch[1]);
                     
-                    // Extract fps and bitrate from ffmpeg output
-                    const fpsMatch = output.match(/fps=\s*([0-9.]+)/);
-                    const bitrateMatch = output.match(/bitrate=\s*([0-9.]+)kbits\/s/);
-                    
-                    if (fpsMatch || bitrateMatch) {
-                        const stats = {};
-                        if (fpsMatch) stats.fps = parseFloat(fpsMatch[1]);
-                        if (bitrateMatch) stats.bitrate = parseFloat(bitrateMatch[1]);
-                        
-                        io.emit('stream-stats', stats);
-                    }
-                });
+                    io.emit('stream-stats', stats);
+                }
+            });
+            
+            streamProcess.on('close', (code) => {
+                console.log(`Stream process exited with code ${code}`);
                 
-                streamProcess.on('close', (code) => {
-                    console.log(`Stream process exited with code ${code}`);
-                    
-                    clearInterval(keepWindowFocused);
-                    
-                    if (isStreaming) {
-                        // If the process ended unexpectedly
-                        io.emit('stream-status', { 
-                            status: 'Error', 
-                            message: `Stream ended unexpectedly with code ${code}` 
-                        });
-                    }
-                    
-                    isStreaming = false;
-                    streamProcess = null;
-                });
+                if (isStreaming) {
+                    // If the process ended unexpectedly
+                    io.emit('stream-status', { 
+                        status: 'Error', 
+                        message: `Stream ended unexpectedly with code ${code}` 
+                    });
+                }
                 
-                isStreaming = true;
-                io.emit('stream-status', { status: 'Streaming' });
-            } else {
-                console.error('Failed to parse window position and size');
-                io.emit('stream-status', { 
-                    status: 'Error', 
-                    message: 'Failed to parse window information' 
-                });
-            }
-        });
+                isStreaming = false;
+                streamProcess = null;
+            });
+            
+            isStreaming = true;
+            io.emit('stream-status', { status: 'Streaming' });
+        } else {
+            console.error('Failed to parse window position and size');
+            io.emit('stream-status', { 
+                status: 'Error', 
+                message: 'Failed to parse window information' 
+            });
+        }
     });
 }
 

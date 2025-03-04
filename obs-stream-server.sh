@@ -247,7 +247,7 @@ function startWindowPreview(windowId) {
         previewProcess = null;
     }
     
-    // Get window position and size
+    // Get window position and size without focusing
     exec(`xwininfo -id 0x${windowId}`, (error, stdout) => {
         if (error) {
             console.error(`Error getting window info: ${error.message}`);
@@ -271,6 +271,7 @@ function startWindowPreview(windowId) {
                 '-f', 'x11grab',
                 '-video_size', `${width}x${height}`,
                 '-framerate', '10',
+                '-frames:v', '1',
                 '-i', `:0.0+${x},${y}`,
                 '-q:v', '5',
                 '-update', '1',
@@ -345,7 +346,7 @@ function startStream(config) {
         return;
     }
     
-    // Get window position and size
+    // Get window position and size without requiring focus
     exec(`xwininfo -id 0x${config.windowId}`, (error, stdout) => {
         if (error) {
             console.error(`Error getting window info: ${error.message}`);
@@ -373,6 +374,7 @@ function startStream(config) {
                 '-f', 'x11grab',
                 '-video_size', `${width}x${height}`,
                 '-framerate', '30',
+                '-draw_mouse', '1',
                 '-i', `:0.0+${x},${y}`,
                 '-f', 'pulse',
                 '-ac', '2',
