@@ -286,6 +286,8 @@ document.addEventListener('DOMContentLoaded', () => {
             audioBitrate: parseInt(audioBitrateSlider.value)
         };
         
+        console.log('Starting stream with config:', config);
+        
         // Send start streaming command to server
         socket.emit('start-stream', config);
         showNotification('Starting stream...', 'info');

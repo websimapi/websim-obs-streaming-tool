@@ -186,6 +186,7 @@ function startWindowPreview(windowId) {
         }
     });
 }
+
 // Send preview frames to the client
 function startSendingPreviewFrames() {
     const previewFile = path.join(TEMP_DIR, 'preview.jpg');
@@ -228,9 +229,10 @@ function startStream(config) {
         return;
     }
     
+    // Base FFmpeg arguments
     const args = [
         '-f', 'x11grab',
-        '-video_size', '1280x720', // We can improve this by getting actual window size
+        '-video_size', '1280x720',
         '-framerate', '30',
         '-i', `:0.0+0,0`,
         '-f', 'pulse',
@@ -276,21 +278,24 @@ function startStream(config) {
                 const height = parseInt(heightMatch[1]);
                 
                 // Update the FFmpeg arguments to capture just this window
-                const inputIndex = args.indexOf('-i') + 1;
-                if (inputIndex > 0 && inputIndex < args.length) {
-                    args[inputIndex] = `:0.0+${x},${y}`;
+                const videoSizeIndex = args.indexOf('-video_size') + 1;
+                if (videoSizeIndex > 0) {
+                    args[videoSizeIndex] = `${width}x${height}`;
                 }
                 
-                const sizeIndex = args.indexOf('-video_size') + 1;
-                if (sizeIndex > 0 && sizeIndex < args.length) {
-                    args[sizeIndex] = `${width}x${height}`;
+                const inputIndex = args.indexOf('-i') + 1;
+                if (inputIndex > 0) {
+                    args[inputIndex] = `:0.0+${x},${y}`;
                 }
                 
                 console.log(`Streaming window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
                 startStreamProcess(args);
             } else {
                 console.error('Failed to parse window position and size');
-                startStreamProcess(args); // Fall back to default capture
+                io.emit('stream-status', { 
+                    status: 'Error', 
+                    message: 'Failed to parse window information' 
+                });
             }
         });
     } else {
