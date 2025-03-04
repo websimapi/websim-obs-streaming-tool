@@ -84,8 +84,7 @@ install_dependencies() {
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.5.1",
-    "ws": "^8.13.0",
-    "xrandr-parse": "^1.0.1"
+    "ws": "^8.13.0"
   }
 }
 EOF
