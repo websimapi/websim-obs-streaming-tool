@@ -171,8 +171,8 @@ function startWindowPreview(windowId) {
                     '-video_size', `${width}x${height}`,
                     '-framerate', '10',
                     '-i', `:0.0+${x},${y}`,
-                    '-follow_window', '0x' + windowId, 
                     '-q:v', '5',
+                    '-frames:v', '1',
                     '-update', '1',
                     '-y',
                     path.join(TEMP_DIR, 'preview.jpg')
@@ -285,8 +285,8 @@ function startStream(config) {
                     '-f', 'x11grab',
                     '-video_size', `${width}x${height}`,
                     '-framerate', '30',
+                    '-draw_mouse', '1',
                     '-i', `:0.0+${x},${y}`,
-                    '-follow_window', '0x' + config.windowId, 
                     '-f', 'pulse',
                     '-ac', '2',
                     '-i', 'default',
@@ -305,6 +305,11 @@ function startStream(config) {
                 ];
                 
                 console.log(`Starting stream of window 0x${config.windowId} at ${x},${y} with size ${width}x${height}`);
+                
+                // Keep the window focused throughout streaming
+                const keepWindowFocused = setInterval(() => {
+                    exec(`xdotool windowactivate 0x${config.windowId}`, () => {});
+                }, 1000);
                 
                 streamProcess = spawn('ffmpeg', args);
                 
@@ -326,6 +331,8 @@ function startStream(config) {
                 
                 streamProcess.on('close', (code) => {
                     console.log(`Stream process exited with code ${code}`);
+                    
+                    clearInterval(keepWindowFocused);
                     
                     if (isStreaming) {
                         // If the process ended unexpectedly

@@ -526,8 +526,6 @@ process.on('SIGINT', () => {
 EOF
     
     log "Server script created"
-    
-    sed -i 's/'-f', 'x11grab',/'-f', 'x11grab',\n                '-follow_window', '0x' + windowId,/g' server.js
 }
 
 create_public_directory() {
